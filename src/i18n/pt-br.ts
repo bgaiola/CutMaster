@@ -245,6 +245,12 @@ const ptBR: Translations = {
     colScrapWidth: 'Largura (mm)',
     colScrapHeight: 'Altura (mm)',
     colScrapArea: 'Área (m²)',
+    // Charts
+    chartUtilByMaterial: '📈 Aproveitamento por Material',
+    chartAreaDistribution: '📊 Distribuição de Área',
+    chartUsed: 'Utilizado',
+    chartWaste: 'Desperdício',
+    chartScrap: 'Sobras',
   },
 
   notifications: {

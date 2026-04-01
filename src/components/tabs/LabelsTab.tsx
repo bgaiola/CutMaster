@@ -5,7 +5,7 @@ import { LabelElement, LabelTemplate, DynamicField, PlacedPiece } from '@/types'
 import { generateId } from '@/utils/helpers';
 import {
   Tag, Trash2, Plus, Eye, Settings2,
-  BarChart, FileDown, ChevronLeft, ChevronRight, GripVertical,
+  BarChart, FileDown, ChevronLeft, ChevronRight, GripVertical, Download,
 } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import jsPDF from 'jspdf';
@@ -155,9 +155,6 @@ export function LabelsTab() {
   const [pdfMargin, setPdfMargin] = useState(10);
 
   const canvasRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{
-    elementId: string; startX: number; startY: number; origX: number; origY: number;
-  } | null>(null);
 
   // ─── All pieces flat ──────────────────────────────────────
   const allPieces: PieceWithMeta[] = useMemo(() => {
@@ -209,28 +206,31 @@ export function LabelsTab() {
     setSelectedElementId(el.id);
   }, []);
 
-  // ─── Drag on canvas ──────────────────────────────────────
+  // ─── Drag on canvas (with click detection) ────────────────
   const handleMouseDown = useCallback((e: React.MouseEvent, elementId: string) => {
     e.stopPropagation();
-    e.preventDefault();
     setSelectedElementId(elementId);
     const el = template.elements.find((x) => x.id === elementId);
     if (!el) return;
-    dragRef.current = { elementId, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y };
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+    const THRESHOLD = 3; // px before we consider it a drag
 
     const move = (ev: MouseEvent) => {
-      if (!dragRef.current || !canvasRef.current) return;
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      if (!dragging && Math.abs(dx) < THRESHOLD && Math.abs(dy) < THRESHOLD) return;
+      dragging = true;
+      if (!canvasRef.current) return;
       const rect = canvasRef.current.getBoundingClientRect();
       const sx = template.width / rect.width;
       const sy = template.height / rect.height;
-      const dx = (ev.clientX - dragRef.current.startX) * sx;
-      const dy = (ev.clientY - dragRef.current.startY) * sy;
-      const nx = Math.max(0, Math.min(template.width - 5, dragRef.current.origX + dx));
-      const ny = Math.max(0, Math.min(template.height - 5, dragRef.current.origY + dy));
-      updateElement(dragRef.current.elementId, { x: nx, y: ny });
+      const nx = Math.max(0, Math.min(template.width - 5, el.x + dx * sx));
+      const ny = Math.max(0, Math.min(template.height - 5, el.y + dy * sy));
+      updateElement(elementId, { x: nx, y: ny });
     };
     const up = () => {
-      dragRef.current = null;
       document.removeEventListener('mousemove', move);
       document.removeEventListener('mouseup', up);
     };
@@ -267,8 +267,10 @@ export function LabelsTab() {
       const src = barcodeToDataURL(value, el.height * CANVAS_SCALE);
       return (
         <g key={el.id}>
-          {src && <image href={src} x={el.x} y={el.y} width={el.width} height={el.height} preserveAspectRatio="xMidYMid meet" />}
-          {selected && <rect x={el.x - 0.5} y={el.y - 0.5} width={el.width + 1} height={el.height + 1} fill="none" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="1.5" rx="0.5" />}
+          {/* Invisible hit area for click/drag */}
+          <rect x={el.x} y={el.y} width={el.width} height={el.height} fill="transparent" style={{ cursor: 'move' }} />
+          {src && <image href={src} x={el.x} y={el.y} width={el.width} height={el.height} preserveAspectRatio="xMidYMid meet" style={{ pointerEvents: 'none' }} />}
+          {selected && <rect x={el.x - 0.5} y={el.y - 0.5} width={el.width + 1} height={el.height + 1} fill="none" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="1.5" rx="0.5" style={{ pointerEvents: 'none' }} />}
         </g>
       );
     }
@@ -278,11 +280,13 @@ export function LabelsTab() {
 
     return (
       <g key={el.id}>
+        {/* Invisible hit area for click/drag */}
+        <rect x={el.x} y={el.y} width={el.width} height={el.height} fill="transparent" style={{ cursor: 'move' }} />
         <text x={tx} y={el.y + el.fontSize * 0.35} fontSize={el.fontSize * 0.35}
-          fontWeight={el.fontWeight} textAnchor={anchor} fill="#1e293b" dominantBaseline="hanging">
+          fontWeight={el.fontWeight} textAnchor={anchor} fill="#1e293b" dominantBaseline="hanging" style={{ pointerEvents: 'none' }}>
           {value || `[${fieldLabels[el.content] || el.content}]`}
         </text>
-        {selected && <rect x={el.x - 0.5} y={el.y - 0.5} width={el.width + 1} height={el.height + 1} fill="none" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="1.5" rx="0.5" />}
+        {selected && <rect x={el.x - 0.5} y={el.y - 0.5} width={el.width + 1} height={el.height + 1} fill="none" stroke="#3b82f6" strokeWidth="0.5" strokeDasharray="1.5" rx="0.5" style={{ pointerEvents: 'none' }} />}
       </g>
     );
   }, [fieldLabels, projectName]);
@@ -345,6 +349,22 @@ export function LabelsTab() {
     pdf.save('cutmaster-labels.pdf');
   }, [allPieces, template, pdfColumns, pdfRowGap, pdfColGap, pdfMargin, projectName]);
 
+  // ─── Export labels CSV ──────────────────────────────────────
+  const handleExportCSV = useCallback(() => {
+    if (allPieces.length === 0) return;
+    const headers = template.elements.map((el) => fieldLabels[el.content] || el.content);
+    const rows = allPieces.map((piece) =>
+      template.elements.map((el) => resolveField(el.content as DynamicField, piece, projectName))
+    );
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cutmaster-labels.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [allPieces, template, fieldLabels, projectName]);
+
   // ─── Preview pages ────────────────────────────────────────
   const previewPages = useMemo(() => {
     if (allPieces.length === 0) return [];
@@ -385,6 +405,9 @@ export function LabelsTab() {
           {t.labelsTab.totalLabels.replace('{count}', String(allPieces.length))}
         </span>
         <div className="flex-1" />
+        <button className="btn-secondary btn-sm flex items-center gap-1 text-xs" onClick={handleExportCSV}>
+          <Download className="w-3.5 h-3.5" /> CSV
+        </button>
         <button
           className={`btn-sm flex items-center gap-1 text-xs px-2 py-1 rounded ${showPreview ? 'btn-secondary' : 'text-surface-500 hover:bg-surface-100'}`}
           onClick={() => { setShowPreview(!showPreview); setPreviewPage(0); }}
@@ -407,14 +430,24 @@ export function LabelsTab() {
             <div className="flex gap-2">
               <div>
                 <label className="text-2xs text-surface-400">{t.labelsTab.labelWidth}</label>
-                <input type="number" value={template.width}
-                  onChange={(e) => setTemplate((p) => ({ ...p, width: Math.max(20, Number(e.target.value)) }))}
+                <input type="number" min={20} defaultValue={template.width}
+                  onBlur={(e) => {
+                    const v = Math.max(20, Math.min(300, Number(e.target.value) || 20));
+                    e.target.value = String(v);
+                    setTemplate((p) => ({ ...p, width: v }));
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                   className="input-field text-xs w-full mt-0.5" />
               </div>
               <div>
                 <label className="text-2xs text-surface-400">{t.labelsTab.labelHeight}</label>
-                <input type="number" value={template.height}
-                  onChange={(e) => setTemplate((p) => ({ ...p, height: Math.max(10, Number(e.target.value)) }))}
+                <input type="number" min={10} defaultValue={template.height}
+                  onBlur={(e) => {
+                    const v = Math.max(10, Math.min(200, Number(e.target.value) || 10));
+                    e.target.value = String(v);
+                    setTemplate((p) => ({ ...p, height: v }));
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
                   className="input-field text-xs w-full mt-0.5" />
               </div>
             </div>

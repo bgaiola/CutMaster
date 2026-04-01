@@ -265,6 +265,12 @@ const es = {
     colScrapWidth: 'Ancho (mm)',
     colScrapHeight: 'Alto (mm)',
     colScrapArea: 'Área (m²)',
+    // Charts
+    chartUtilByMaterial: '📈 Aprovechamiento por Material',
+    chartAreaDistribution: '📊 Distribución de Área',
+    chartUsed: 'Utilizado',
+    chartWaste: 'Desperdicio',
+    chartScrap: 'Sobras',
   },
 
   // ─── Notifications ───────────────────

@@ -3,6 +3,11 @@ import { useTranslation } from '@/i18n';
 import { FileText, Download } from 'lucide-react';
 import { areaM2 } from '@/utils/helpers';
 
+const CHART_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1',
+];
+
 export function ReportsTab() {
   const { t } = useTranslation();
   const result = useAppStore((s) => s.result);
@@ -96,7 +101,82 @@ export function ReportsTab() {
           </div>
         </div>
 
-        {/* 2. Material Consumption */}
+        {/* 2. Charts — Utilization by Material */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-surface-700 uppercase tracking-wider mb-4">
+            {t.reportsTab.chartUtilByMaterial}
+          </h3>
+          <div className="space-y-3">
+            {Array.from(materialMap).map(([code, data], idx) => {
+              const total = data.usedArea + data.wasteArea;
+              const pct = total > 0 ? (data.usedArea / total * 100) : 0;
+              return (
+                <div key={code}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-surface-700">{code}</span>
+                    <span className={`text-xs font-bold ${pct >= 80 ? 'text-emerald-600' : pct >= 60 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {pct.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="h-6 bg-surface-100 rounded-full overflow-hidden flex">
+                    <div className="h-full rounded-l-full transition-all"
+                      style={{ width: `${pct}%`, backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} />
+                    <div className="h-full bg-surface-200" style={{ width: `${100 - pct}%` }} />
+                  </div>
+                  <div className="flex justify-between mt-0.5 text-2xs text-surface-400">
+                    <span>{t.reportsTab.chartUsed}: {(data.usedArea / 1e6).toFixed(3)} m²</span>
+                    <span>{t.reportsTab.chartWaste}: {(data.wasteArea / 1e6).toFixed(3)} m²</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3. Chart — Area Distribution */}
+        <div className="card p-5">
+          <h3 className="text-sm font-bold text-surface-700 uppercase tracking-wider mb-4">
+            {t.reportsTab.chartAreaDistribution}
+          </h3>
+          {(() => {
+            const totalArea = result.plans.reduce((s, p) => s + p.sheetWidth * p.sheetHeight * p.stackCount, 0);
+            const usedArea = result.plans.reduce((s, p) => s + p.usedArea, 0);
+            const scrapArea = result.totalUsableScrapArea;
+            const wasteArea = totalArea - usedArea - scrapArea;
+            const pUsed = totalArea > 0 ? (usedArea / totalArea * 100) : 0;
+            const pScrap = totalArea > 0 ? (scrapArea / totalArea * 100) : 0;
+            const pWaste = totalArea > 0 ? (wasteArea / totalArea * 100) : 0;
+            const segments = [
+              { label: t.reportsTab.chartUsed, pct: pUsed, area: usedArea, color: '#3b82f6' },
+              { label: t.reportsTab.chartScrap, pct: pScrap, area: scrapArea, color: '#10b981' },
+              { label: t.reportsTab.chartWaste, pct: pWaste, area: wasteArea, color: '#ef4444' },
+            ];
+            return (
+              <div>
+                <div className="h-8 rounded-full overflow-hidden flex mb-3">
+                  {segments.map((s, i) => (
+                    <div key={i} className="h-full flex items-center justify-center text-white text-2xs font-bold"
+                      style={{ width: `${Math.max(s.pct, 1)}%`, backgroundColor: s.color }}>
+                      {s.pct >= 8 ? `${s.pct.toFixed(0)}%` : ''}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-6 justify-center">
+                  {segments.map((s, i) => (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: s.color }} />
+                      <span className="text-surface-600">{s.label}</span>
+                      <span className="font-bold text-surface-800">{s.pct.toFixed(1)}%</span>
+                      <span className="text-surface-400">({(s.area / 1e6).toFixed(3)} m²)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* 4. Material Consumption Table */}
         <div className="card p-5">
           <h3 className="text-sm font-bold text-surface-700 uppercase tracking-wider mb-4">
             {t.reportsTab.materialConsumption}
@@ -133,7 +213,7 @@ export function ReportsTab() {
           </table>
         </div>
 
-        {/* 3. Produced Pieces List */}
+        {/* 5. Produced Pieces List */}
         <div className="card p-5">
           <h3 className="text-sm font-bold text-surface-700 uppercase tracking-wider mb-4">
             {t.reportsTab.producedPieces}
@@ -176,7 +256,7 @@ export function ReportsTab() {
           </div>
         </div>
 
-        {/* 4. Scrap Report */}
+        {/* 6. Scrap Report */}
         <div className="card p-5">
           <h3 className="text-sm font-bold text-surface-700 uppercase tracking-wider mb-4">
             {t.reportsTab.scrapReport}

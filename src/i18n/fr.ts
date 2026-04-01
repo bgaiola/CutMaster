@@ -245,6 +245,12 @@ const fr: Translations = {
     colScrapWidth: 'Largeur (mm)',
     colScrapHeight: 'Hauteur (mm)',
     colScrapArea: 'Surface (m²)',
+    // Charts
+    chartUtilByMaterial: '📈 Utilisation par Matériau',
+    chartAreaDistribution: '📊 Distribution de Surface',
+    chartUsed: 'Utilisé',
+    chartWaste: 'Déchet',
+    chartScrap: 'Chutes',
   },
 
   notifications: {
