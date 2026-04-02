@@ -9,15 +9,18 @@ export function OptimizationOverlay() {
   const progress = useAppStore((s) => s.optimizationProgress);
   const detail = useAppStore((s) => s.optimizationDetail);
   const [elapsed, setElapsed] = useState(0);
-  const [startTime] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!isOptimizing) return;
+    if (!isOptimizing) {
+      setElapsed(0);
+      return;
+    }
+    const start = Date.now();
     const timer = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTime) / 1000));
+      setElapsed(Math.floor((Date.now() - start) / 1000));
     }, 500);
     return () => clearInterval(timer);
-  }, [isOptimizing, startTime]);
+  }, [isOptimizing]);
 
   if (!isOptimizing) return null;
 
