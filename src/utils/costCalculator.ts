@@ -31,11 +31,27 @@ export function enrichResultWithCosts(
     const sheetAreaM2 = (plan.sheetWidth * plan.sheetHeight) / 1e6;
     const wasteAreaM2 = plan.wasteArea / 1e6;
 
-    // Estimate total cut length:
-    // H cuts traverse sheet width, V cuts traverse sheet height (conservative for guillotine)
-    const hCuts = plan.cuts.filter((c) => c.type === 'H').length;
-    const vCuts = plan.cuts.filter((c) => c.type === 'V').length;
-    const totalCutLengthM = ((hCuts * plan.sheetWidth) + (vCuts * plan.sheetHeight)) / 1000;
+    // Estimate total cut length from placed pieces.
+    // Each unique cut line (horizontal or vertical edge of a piece) contributes to the total.
+    // We collect all distinct X and Y coordinates where cuts occur within the usable area,
+    // then sum up the actual lengths those cuts span across the sheet.
+    const trimL = mat.trimLeft;
+    const trimT = mat.trimTop;
+    const usableW = plan.sheetWidth - mat.trimLeft - mat.trimRight;
+    const usableH = plan.sheetHeight - mat.trimTop - mat.trimBottom;
+
+    const hLines = new Set<number>(); // Y coordinates of horizontal cuts
+    const vLines = new Set<number>(); // X coordinates of vertical cuts
+    for (const piece of plan.pieces) {
+      // Bottom edge of piece (horizontal cut)
+      const bottom = piece.y + piece.height;
+      if (bottom > trimT && bottom < trimT + usableH) hLines.add(Math.round(bottom * 100));
+      // Right edge of piece (vertical cut)
+      const right = piece.x + piece.width;
+      if (right > trimL && right < trimL + usableW) vLines.add(Math.round(right * 100));
+    }
+    // Each horizontal cut traverses the usable width; each vertical cut traverses the usable height
+    const totalCutLengthM = (hLines.size * usableW + vLines.size * usableH) / 1000;
 
     // Edge band cost: sum up linear meters per band code for all pieces in plan
     let planEdgeBandCost = 0;

@@ -38,6 +38,10 @@ interface AppState {
   // Project
   projectName: string;
   setProjectName: (name: string) => void;
+  projectId: string | null;
+  setProjectId: (id: string | null) => void;
+  isDirty: boolean;
+  setIsDirty: (val: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()((set) => ({
@@ -94,5 +98,9 @@ export const useAppStore = create<AppState>()((set) => ({
     })),
 
   projectName: 'Nuevo Proyecto',
-  setProjectName: (name) => set({ projectName: name }),
+  setProjectName: (name) => set({ projectName: name, isDirty: true }),
+  projectId: null,
+  setProjectId: (id) => set({ projectId: id }),
+  isDirty: false,
+  setIsDirty: (val) => set({ isDirty: val }),
 }));

@@ -3,6 +3,7 @@ import { useMaterialsStore } from '@/stores/materialsStore';
 import { useAppStore } from '@/stores/appStore';
 import { GrainDirection, Material } from '@/types';
 import { csvToArray, parseNumberSafe } from '@/utils/helpers';
+import { validateCSVFile, clampDimension, clampCost } from '@/utils/validation';
 import { useTranslation } from '@/i18n';
 import { Plus, Trash2, Upload, Download } from 'lucide-react';
 
@@ -65,6 +66,8 @@ export function MaterialsTab() {
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const err = validateCSVFile(file);
+    if (err) { alert(err.message); e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onload = () => {
       const rows = csvToArray(reader.result as string);
@@ -84,8 +87,8 @@ export function MaterialsTab() {
           code: g('code') || g('código') || g('codigo') || '',
           description: g('description') || g('descripción') || g('descrição') || g('desc') || '',
           thickness: parseNumberSafe(g('thickness') || g('espesor') || g('espessura') || g('espessor'), 15),
-          sheetWidth: g('sheetwidth') ? parseNumberSafe(g('sheetwidth'), 2750) : parseNumberSafe(g('ancho chapa') || g('largura chapa') || g('ancho') || g('largura') || g('width'), 2750),
-          sheetHeight: g('sheetheight') ? parseNumberSafe(g('sheetheight'), 1830) : parseNumberSafe(g('alto chapa') || g('altura chapa') || g('alto') || g('altura') || g('height'), 1830),
+          sheetWidth: clampDimension(g('sheetwidth') ? parseNumberSafe(g('sheetwidth'), 2750) : parseNumberSafe(g('ancho chapa') || g('largura chapa') || g('ancho') || g('largura') || g('width'), 2750)),
+          sheetHeight: clampDimension(g('sheetheight') ? parseNumberSafe(g('sheetheight'), 1830) : parseNumberSafe(g('alto chapa') || g('altura chapa') || g('alto') || g('altura') || g('height'), 1830)),
           grainDirection,
           trimTop: parseNumberSafe(g('trimtop') || g('recorte sup') || g('recorte superior') || g('trim top'), 0),
           trimBottom: parseNumberSafe(g('trimbottom') || g('recorte inf') || g('recorte inferior') || g('trim bottom'), 0),
@@ -93,9 +96,9 @@ export function MaterialsTab() {
           trimRight: parseNumberSafe(g('trimright') || g('recorte der') || g('recorte dir') || g('trim right'), 0),
           minScrapWidth: parseNumberSafe(g('minscrapwidth') || g('sobra ancho mín') || g('sobra largura mín') || g('min scrap width'), 300),
           minScrapHeight: parseNumberSafe(g('minscrapheight') || g('sobra alto mín') || g('sobra altura mín') || g('min scrap height'), 300),
-          pricePerM2: parseNumberSafe(g('priceperm2') || g('precio m2') || g('preço m2') || g('price per m2'), 0),
-          wasteCostPerM2: parseNumberSafe(g('wastecostperm2') || g('coste desperdicio m2') || g('custo desperdicio m2') || g('waste cost per m2'), 0),
-          cutCostPerLinearM: parseNumberSafe(g('cutcostperlinearm') || g('coste corte ml') || g('custo corte ml') || g('cut cost per linear m'), 0),
+          pricePerM2: clampCost(parseNumberSafe(g('priceperm2') || g('precio m2') || g('preço m2') || g('price per m2'), 0)),
+          wasteCostPerM2: clampCost(parseNumberSafe(g('wastecostperm2') || g('coste desperdicio m2') || g('custo desperdicio m2') || g('waste cost per m2'), 0)),
+          cutCostPerLinearM: clampCost(parseNumberSafe(g('cutcostperlinearm') || g('coste corte ml') || g('custo corte ml') || g('cut cost per linear m'), 0)),
         };
       });
       importMaterials(mapped);

@@ -1,11 +1,19 @@
+import { useState, useEffect } from 'react';
 import { useAppStore } from '@/stores/appStore';
 import { usePiecesStore } from '@/stores/piecesStore';
 import { useMaterialsStore } from '@/stores/materialsStore';
 import { useEdgeBandsStore } from '@/stores/edgeBandsStore';
+import { useFiguresStore } from '@/stores/figuresStore';
+import { useAuthStore } from '@/stores/authStore';
 import { runOptimization } from '@/engine/optimizer';
 import { enrichResultWithCosts } from '@/utils/costCalculator';
 import { useTranslation, localeLabels } from '@/i18n';
 import { Locale, Currency, CURRENCY_SYMBOLS } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { AuthModal } from '@/components/auth/AuthModal';
+import { ProjectManager } from '@/components/projects/ProjectManager';
+import { ExportMenu } from '@/components/ui/ExportMenu';
+import { ApiKeysPanel } from '@/components/settings/ApiKeysPanel';
 import {
   Brain,
   RotateCcw,
@@ -15,6 +23,9 @@ import {
   Globe,
   DollarSign,
   Sparkles,
+  User,
+  FolderOpen,
+  LogOut,
 } from 'lucide-react';
 
 export function Toolbar() {
@@ -29,6 +40,7 @@ export function Toolbar() {
   const addNotification = useAppStore((s) => s.addNotification);
   const projectName = useAppStore((s) => s.projectName);
   const setProjectName = useAppStore((s) => s.setProjectName);
+  const isDirty = useAppStore((s) => s.isDirty);
   const locale = useAppStore((s) => s.locale);
   const setLocale = useAppStore((s) => s.setLocale);
   const costEnabled = useAppStore((s) => s.costEnabled);
@@ -39,6 +51,17 @@ export function Toolbar() {
   const pieces = usePiecesStore((s) => s.pieces);
   const materials = useMaterialsStore((s) => s.materials);
   const edgeBands = useEdgeBandsStore((s) => s.edgeBands);
+  const figures = useFiguresStore((s) => s.figures);
+
+  const user = useAuthStore((s) => s.user);
+  const signOut = useAuthStore((s) => s.signOut);
+  const initAuth = useAuthStore((s) => s.initialize);
+
+  const [showAuth, setShowAuth] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
+  const [showApiKeys, setShowApiKeys] = useState(false);
+
+  useEffect(() => { initAuth(); }, [initAuth]);
 
   const handleOptimize = async () => {
     if (pieces.length === 0) {
@@ -64,7 +87,7 @@ export function Toolbar() {
     try {
       let result = await runOptimization(pieces, materials, edgeBands, config, (pct, detail) => {
         setProgress(pct, detail);
-      });
+      }, figures.length > 0 ? figures : undefined);
       if (costEnabled) {
         result = enrichResultWithCosts(result, materials, edgeBands);
       }
@@ -238,10 +261,58 @@ export function Toolbar() {
         </select>
       </div>
 
-      {/* Settings */}
-      <button className="btn-ghost btn-sm" title={t.toolbar.settings}>
-        <Settings2 className="w-4 h-4" />
+      {/* Export menu */}
+      <ExportMenu />
+
+      {/* Divider */}
+      <div className="h-6 w-px bg-surface-200" />
+
+      {/* Projects */}
+      <button
+        className="btn-ghost btn-sm flex items-center gap-1"
+        onClick={() => setShowProjects(true)}
+        title={t.toolbar.projects}
+      >
+        <FolderOpen className="w-4 h-4" />
+        <span className="text-xs hidden sm:inline">{t.toolbar.projects}</span>
+        {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
       </button>
+
+      {/* Auth / User */}
+      {supabase && (
+        user ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-surface-500 hidden sm:inline">{user.email}</span>
+            <button
+              className="btn-ghost btn-sm"
+              onClick={signOut}
+              title={t.auth.logout}
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            className="btn-ghost btn-sm flex items-center gap-1"
+            onClick={() => setShowAuth(true)}
+          >
+            <User className="w-4 h-4" />
+            <span className="text-xs hidden sm:inline">{t.auth.login}</span>
+          </button>
+        )
+      )}
+
+      {/* Settings / API Keys */}
+      {user && (
+        <button
+          className="btn-ghost btn-sm flex items-center gap-1"
+          onClick={() => setShowApiKeys(true)}
+          title={t.toolbar.apiKeys}
+        >
+          <Settings2 className="w-4 h-4" />
+          <span className="text-xs hidden sm:inline">API</span>
+        </button>
+      )}
 
       {/* Optimize button */}
       <button
@@ -261,6 +332,11 @@ export function Toolbar() {
           </>
         )}
       </button>
+
+      {/* Modals */}
+      {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
+      {showProjects && <ProjectManager onClose={() => setShowProjects(false)} />}
+      {showApiKeys && <ApiKeysPanel onClose={() => setShowApiKeys(false)} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useEdgeBandsStore } from '@/stores/edgeBandsStore';
 import { EdgeBand } from '@/types';
 import { parseNumberSafe, csvToArray } from '@/utils/helpers';
+import { validateCSVFile } from '@/utils/validation';
 import { useTranslation } from '@/i18n';
 import { Plus, Trash2, Upload, Download } from 'lucide-react';
 
@@ -35,6 +36,8 @@ export function EdgeBandsTab() {
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const err = validateCSVFile(file);
+    if (err) { alert(err.message); e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onload = () => {
       const rows = csvToArray(reader.result as string);

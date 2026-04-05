@@ -13,4 +13,16 @@ export default defineConfig({
   worker: {
     format: 'es',
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'zustand'],
+          'vendor-pdf': ['jspdf', 'jspdf-autotable'],
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-utils': ['file-saver', 'papaparse', 'uuid', 'jsbarcode'],
+        },
+      },
+    },
+  },
 });

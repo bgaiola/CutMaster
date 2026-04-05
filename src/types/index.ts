@@ -209,6 +209,24 @@ export interface LabelTemplate {
   elements: LabelElement[];
 }
 
+// ─── Figures (Grain Matching) ──────────────────────────────
+
+export interface FigurePiecePlacement {
+  pieceId: string;     // references Piece.id
+  relativeX: number;   // mm from figure origin
+  relativeY: number;   // mm from figure origin
+}
+
+export interface Figure {
+  id: string;
+  name: string;
+  pieceIds: string[];              // source piece IDs
+  layout: FigurePiecePlacement[];  // positioned pieces
+  gap: number;                     // mm between pieces (default = bladeThickness)
+  boundingWidth: number;           // mm — auto-calculated
+  boundingHeight: number;          // mm — auto-calculated
+}
+
 // ─── UI Types ──────────────────────────────────────────────
 
 export type Locale = 'es' | 'pt-BR' | 'en' | 'fr' | 'it';

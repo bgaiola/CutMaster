@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import type {
-  Piece, Material, EdgeBand, OptimizationConfig, OptimizationResult,
+  Piece, Material, EdgeBand, OptimizationConfig, OptimizationResult, Figure,
 } from '@/types';
 
 // Vite resolves `?worker` imports to inline web workers at build time.
@@ -12,12 +12,17 @@ import OptimizerWorker from './optimizer.worker?worker';
 
 import type { WorkerOutMsg } from './optimizer.worker';
 
+// Re-export the core optimizer for non-Worker contexts (API, SSR, tests)
+export { runOptimizationCore } from './optimizer.worker';
+export type { ProgressCallback } from './optimizer.worker';
+
 export async function runOptimization(
   pieces: Piece[],
   materials: Material[],
   edgeBands: EdgeBand[],
   config: OptimizationConfig,
   onProgress?: (pct: number, detail?: string) => void,
+  figures?: Figure[],
 ): Promise<OptimizationResult> {
   return new Promise<OptimizationResult>((resolve, reject) => {
     const worker = new OptimizerWorker();
@@ -55,6 +60,7 @@ export async function runOptimization(
       materials,
       edgeBands,
       config,
+      figures,
     });
   });
 }

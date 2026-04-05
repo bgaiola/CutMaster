@@ -5,10 +5,12 @@ import { useEdgeBandsStore } from '@/stores/edgeBandsStore';
 import { PiecePreview } from '@/components/pieces/PiecePreview';
 import { Piece, GrainDirection } from '@/types';
 import { csvToArray, parseNumberSafe } from '@/utils/helpers';
+import { validateCSVFile, clampDimension, clampQuantity } from '@/utils/validation';
 import { useTranslation } from '@/i18n';
 import {
-  Plus, Trash2, Copy, Upload, ArrowUpDown,
+  Plus, Trash2, Copy, Upload, ArrowUpDown, Layers,
 } from 'lucide-react';
+import { FigureEditor } from '@/components/figures/FigureEditor';
 
 export function PiecesTab() {
   const { t } = useTranslation();
@@ -30,6 +32,7 @@ export function PiecesTab() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [filter, setFilter] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showFigureEditor, setShowFigureEditor] = useState(false);
 
   const selectedPiece = useMemo(
     () => pieces.find((p) => p.id === selectedPieceId) || null,
@@ -102,6 +105,8 @@ export function PiecesTab() {
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const err = validateCSVFile(file);
+    if (err) { alert(err.message); e.target.value = ''; return; }
     const reader = new FileReader();
     reader.onload = () => {
       const rows = csvToArray(reader.result as string);
@@ -117,9 +122,9 @@ export function PiecesTab() {
         else if (grainRaw === 'vertical' || grainRaw === 'v') grainDirection = 'vertical';
         return {
           material: get('material') || get('código material'),
-          quantity: Math.max(1, parseInt(get('quantidade') || get('qty') || get('cantidad') || '1', 10) || 1),
-          width: parseNumberSafe(get('largura') || get('width') || get('ancho'), 0),
-          height: parseNumberSafe(get('altura') || get('height') || get('alto'), 0),
+          quantity: clampQuantity(parseInt(get('quantidade') || get('qty') || get('cantidad') || '1', 10) || 1),
+          width: clampDimension(parseNumberSafe(get('largura') || get('width') || get('ancho'), 0)),
+          height: clampDimension(parseNumberSafe(get('altura') || get('height') || get('alto'), 0)),
           grainDirection,
           edgeBandTop: get('fita superior') || get('fita sup') || get('cinta sup') || get('canto sup') || get('edge top') || '',
           edgeBandBottom: get('fita inferior') || get('fita inf') || get('cinta inf') || get('canto inf') || get('edge bottom') || '',
@@ -186,6 +191,14 @@ export function PiecesTab() {
             disabled={selectedIds.size === 0}
           >
             <Trash2 className="w-3.5 h-3.5" /> {t.piecesTab.remove}
+          </button>
+          <button
+            className="btn-secondary btn-sm flex items-center gap-1"
+            onClick={() => setShowFigureEditor(true)}
+            disabled={selectedIds.size < 2}
+            title={t.figures.createTooltip}
+          >
+            <Layers className="w-3.5 h-3.5" /> {t.figures.create}
           </button>
           <div className="h-5 w-px bg-surface-200 mx-1" />
           <button className="btn-secondary btn-sm" onClick={() => fileInputRef.current?.click()}>
@@ -397,6 +410,15 @@ export function PiecesTab() {
           </div>
         )}
       </div>
+
+      {/* Figure Editor Modal */}
+      {showFigureEditor && selectedIds.size >= 2 && (
+        <FigureEditor
+          pieceIds={Array.from(selectedIds)}
+          onClose={() => setShowFigureEditor(false)}
+          onSave={() => setShowFigureEditor(false)}
+        />
+      )}
     </div>
   );
 }

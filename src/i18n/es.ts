@@ -48,6 +48,8 @@ const es = {
     costTooltip: 'Activar cálculo de costos',
     advancedToggle: 'Avanzado',
     advancedTooltip: 'Optimización avanzada: más lenta pero mejores resultados',
+    projects: 'Proyectos',
+    apiKeys: 'Claves API',
   },
 
   // ─── Tabs ────────────────────────────
@@ -349,6 +351,83 @@ const es = {
     bottom: 'Inf',
     left: 'Izq',
     right: 'Der',
+  },
+
+  // ─── Auth ────────────────────────────
+  auth: {
+    login: 'Iniciar Sesión',
+    register: 'Crear Cuenta',
+    logout: 'Cerrar Sesión',
+    email: 'Email',
+    emailPlaceholder: 'tu@email.com',
+    password: 'Contraseña',
+    passwordPlaceholder: 'Mínimo 6 caracteres',
+    displayName: 'Nombre',
+    displayNamePlaceholder: 'Tu nombre',
+    loginButton: 'Iniciar Sesión',
+    registerButton: 'Crear Cuenta',
+    noAccount: '¿No tienes cuenta?',
+    hasAccount: '¿Ya tienes cuenta?',
+    registerLink: 'Regístrate',
+    loginLink: 'Inicia sesión',
+  },
+
+  // ─── Projects ───────────────────────
+  projects: {
+    title: 'Proyectos',
+    newProject: 'Nuevo Proyecto',
+    newProjectName: 'Nuevo Proyecto',
+    save: 'Guardar',
+    saved: 'Proyecto guardado',
+    saveError: 'Error al guardar',
+    loaded: 'Proyecto cargado',
+    loadError: 'Error al cargar',
+    deleted: 'Proyecto eliminado',
+    confirmDelete: '¿Eliminar este proyecto?',
+    empty: 'Sin proyectos',
+    emptyHint: 'Guarde su primer proyecto para comenzar',
+  },
+
+  // ─── Figures (Grain Matching) ────────
+  figures: {
+    create: 'Crear Figura',
+    createTooltip: 'Agrupar piezas seleccionadas para continuidad de veta',
+    editorTitle: 'Editor de Figuras',
+    gap: 'Espacio',
+    stackVertical: 'Apilar vertical',
+    stackHorizontal: 'Apilar horizontal',
+    save: 'Guardar Figura',
+    hint: 'Arrastre las piezas para posicionarlas. Las piezas se cortarán del mismo tablero para mantener la continuidad de la veta.',
+  },
+
+  // ─── API Keys ───────────────────────
+  apiKeys: {
+    title: 'Claves API',
+    create: 'Crear Clave',
+    keyName: 'Nombre de la clave',
+    keyNamePlaceholder: 'Ej: Mi App, Integración ERP',
+    newKeyCreated: 'Clave API creada',
+    newKeyWarning: 'Copie esta clave ahora. No se mostrará de nuevo.',
+    dismiss: 'Cerrar',
+    confirmRevoke: '¿Revocar esta clave API? Las integraciones que la usen dejarán de funcionar.',
+    activeKeys: 'Claves activas',
+    revokedKeys: 'Claves revocadas',
+    empty: 'No tiene claves API',
+    created: 'Creada',
+    lastUsed: 'Último uso',
+    revoke: 'Revocar',
+    usageTitle: 'Ejemplo de uso',
+  },
+
+  // ─── Export ─────────────────────────
+  exportMenu: {
+    title: 'Exportar',
+    pdfReport: 'Informe PDF Completo',
+    pdfPlans: 'PDF Planos de Corte',
+    dxfAll: 'DXF (Todos los Planos)',
+    csvCutList: 'CSV Lista de Corte',
+    json: 'JSON',
+    svg: 'SVG',
   },
 
   // ─── Optimization Overlay ────────────

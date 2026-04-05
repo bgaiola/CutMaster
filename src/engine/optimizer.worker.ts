@@ -6,7 +6,7 @@
 import type {
   Piece, Material, EdgeBand, OptimizationConfig,
   OptimizationResult, CuttingPlan, PlacedPiece, ScrapRect, CutInstruction,
-  GrainDirection,
+  GrainDirection, Figure,
 } from '@/types';
 
 // ─── Inline generateId ───────────────────────────────────
@@ -16,7 +16,7 @@ function generateId(): string {
 }
 
 // ─── Message types ────────────────────────────────────────
-interface WorkerInput { type: 'run'; pieces: Piece[]; materials: Material[]; edgeBands: EdgeBand[]; config: OptimizationConfig; }
+interface WorkerInput { type: 'run'; pieces: Piece[]; materials: Material[]; edgeBands: EdgeBand[]; config: OptimizationConfig; figures?: Figure[]; }
 interface WorkerProgressMsg { type: 'progress'; pct: number; detail: string; }
 interface WorkerResultMsg { type: 'result'; data: OptimizationResult; }
 interface WorkerErrorMsg { type: 'error'; message: string; }
@@ -78,17 +78,125 @@ function scoreR(r: FR, pw: number, ph: number, h: Heuristic): number {
 const ALL_H: Heuristic[] = ['BSSF', 'BLSF', 'BAF', 'BLTC', 'BL', 'CP'];
 
 // ─── Progress ─────────────────────────────────────────────
-function reportProgress(pct: number, detail: string = ''): void {
+export type ProgressCallback = (pct: number, detail: string) => void;
+let _onProgress: ProgressCallback = (pct, detail) => {
   self.postMessage({ type: 'progress', pct, detail } satisfies WorkerProgressMsg);
+};
+function reportProgress(pct: number, detail: string = ''): void {
+  _onProgress(pct, detail);
 }
 
 // ═══════════════════════════════════════════════════════════
-// MAIN OPTIMIZATION
+// MAIN OPTIMIZATION — exported as pure function for API use
 // ═══════════════════════════════════════════════════════════
-function runOptimization(pieces: Piece[], materials: Material[], edgeBands: EdgeBand[], config: OptimizationConfig): OptimizationResult {
+export function runOptimizationCore(
+  pieces: Piece[], materials: Material[], edgeBands: EdgeBand[], config: OptimizationConfig,
+  onProgress?: ProgressCallback,
+  figures?: Figure[],
+): OptimizationResult {
+  if (onProgress) _onProgress = onProgress;
+  return _runOptimization(pieces, materials, edgeBands, config, figures);
+}
+
+// ─── Figure super-piece helpers ──────────────────────────
+interface FigureMapping {
+  superPieceId: string;
+  figure: Figure;
+  childPieces: Piece[];   // the original pieces in this figure
+}
+
+/** Replace figure-grouped pieces with a single super-piece per figure. */
+function applyFigures(pieces: Piece[], figures: Figure[]): { pieces: Piece[]; mappings: FigureMapping[] } {
+  if (!figures || figures.length === 0) return { pieces, mappings: [] };
+
+  const figuredPieceIds = new Set<string>();
+  const mappings: FigureMapping[] = [];
+  const result: Piece[] = [];
+
+  for (const fig of figures) {
+    if (fig.layout.length === 0 || fig.boundingWidth <= 0 || fig.boundingHeight <= 0) continue;
+    const children = fig.pieceIds.map(id => pieces.find(p => p.id === id)).filter(Boolean) as Piece[];
+    if (children.length === 0) continue;
+
+    for (const c of children) figuredPieceIds.add(c.id);
+
+    // Create super-piece with bounding box dimensions
+    const superPiece: Piece = {
+      id: `__fig_${fig.id}`,
+      code: `FIG-${fig.name}`,
+      material: children[0].material, // all children must share material
+      quantity: 1,
+      width: Math.ceil(fig.boundingWidth),
+      height: Math.ceil(fig.boundingHeight),
+      grainDirection: children[0].grainDirection,
+      edgeBandTop: '', edgeBandBottom: '', edgeBandLeft: '', edgeBandRight: '',
+      sequence: null,
+      description: fig.name,
+      description2: `${children.length} pieces`,
+    };
+    result.push(superPiece);
+    mappings.push({ superPieceId: superPiece.id, figure: fig, childPieces: children });
+  }
+
+  // Add non-figured pieces
+  for (const p of pieces) {
+    if (!figuredPieceIds.has(p.id)) result.push(p);
+  }
+
+  return { pieces: result, mappings };
+}
+
+/** After optimization, explode super-pieces back into individual pieces with correct positions. */
+function explodeFigures(plans: CuttingPlan[], mappings: FigureMapping[]): CuttingPlan[] {
+  if (mappings.length === 0) return plans;
+  const mappingMap = new Map(mappings.map(m => [m.superPieceId, m]));
+
+  return plans.map(plan => {
+    const newPieces: PlacedPiece[] = [];
+    for (const placed of plan.pieces) {
+      const mapping = mappingMap.get(placed.pieceId);
+      if (!mapping) {
+        newPieces.push(placed);
+        continue;
+      }
+      // Explode: place each child piece at super-piece position + relative offset
+      for (const layout of mapping.figure.layout) {
+        const child = mapping.childPieces.find(c => c.id === layout.pieceId);
+        if (!child) continue;
+        newPieces.push({
+          pieceId: child.id,
+          code: child.code,
+          x: placed.x + layout.relativeX,
+          y: placed.y + layout.relativeY,
+          width: child.width,
+          height: child.height,
+          rotated: placed.rotated,
+          originalWidth: child.width,
+          originalHeight: child.height,
+          grainDirection: child.grainDirection,
+          description: child.description,
+          description2: child.description2,
+          material: child.material,
+          sequence: child.sequence,
+          quantity: child.quantity,
+          edgeBandTop: child.edgeBandTop,
+          edgeBandBottom: child.edgeBandBottom,
+          edgeBandLeft: child.edgeBandLeft,
+          edgeBandRight: child.edgeBandRight,
+        });
+      }
+    }
+    return { ...plan, pieces: newPieces };
+  });
+}
+
+function _runOptimization(pieces: Piece[], materials: Material[], edgeBands: EdgeBand[], config: OptimizationConfig, figures?: Figure[]): OptimizationResult {
   const startTime = performance.now();
   reportProgress(2, '');
-  const processed = preProcess(pieces, edgeBands);
+
+  // Apply figures: replace grouped pieces with super-pieces
+  const { pieces: effectivePieces, mappings } = applyFigures(pieces, figures ?? []);
+  const processed = preProcess(effectivePieces, edgeBands);
 
   const byMaterial = new Map<string, PP[]>();
   for (const p of processed) {
@@ -200,7 +308,9 @@ function runOptimization(pieces: Piece[], materials: Material[], edgeBands: Edge
     reportProgress(5 + Math.round((matIdx / totalMats) * 85));
   }
 
-  const deduped = deduplicatePlans(allPlans, config);
+  // Explode figure super-pieces back into individual pieces
+  const exploded = explodeFigures(allPlans, mappings);
+  const deduped = deduplicatePlans(exploded, config);
   for (const plan of deduped)
     plan.pieces.sort((a, b) => {
       if (a.sequence !== null && b.sequence !== null) return a.sequence - b.sequence;
@@ -775,9 +885,9 @@ function optimizeLastSheet(plans: CuttingPlan[], mat: Material, uw: number, uh: 
 // WORKER MESSAGE HANDLER
 // ═══════════════════════════════════════════════════════════
 self.onmessage = (e: MessageEvent<WorkerInput>) => {
-  const { pieces, materials, edgeBands, config } = e.data;
+  const { pieces, materials, edgeBands, config, figures } = e.data;
   try {
-    const result = runOptimization(pieces, materials, edgeBands, config);
+    const result = _runOptimization(pieces, materials, edgeBands, config, figures);
     self.postMessage({ type: 'result', data: result } satisfies WorkerResultMsg);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown optimization error';
